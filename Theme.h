@@ -12,7 +12,7 @@ constexpr const char *TaskBackground = "#10141c";
     constexpr const char *TextColor        = "#ffffff";
     constexpr const char *MutedTextColor   = "#9aa4b2";
 
-    constexpr int ButtonHeight  = 54;  // dock icon cell: icon strip + indicator dot row
+    constexpr int ButtonHeight  = 50;  // dock icon cell: icon strip + indicator dot row
     constexpr int ButtonRadius  = 6;   // corner radius of the hover highlight
     constexpr int BarSpacing    = 4;
     constexpr int BarMargin     = 4;
@@ -26,8 +26,19 @@ constexpr const char *TaskBackground = "#10141c";
     constexpr int DockRadius       = 16;   // pill corner radius
     constexpr int DockPadding      = 6;    // icons -> pill edge
     constexpr int DockSpacing      = 3;    // gap between icon cells
-    constexpr int DockMarginBottom = 6;    // gap between pill and screen bottom
+    constexpr int DockMarginBottom = 0;    // gap between pill and screen bottom
     constexpr int DotRadius        = 3;    // focused-window indicator dot
     constexpr int DockBorderAlpha  = 28;   // 0-255: subtle rim highlight on the pill
     constexpr int DockHoverAlpha   = 36;   // 0-255: highlight behind the hovered icon
+
+    // How much vertical space at the bottom of the screen the dock
+    // reserves for itself (the layer-shell "exclusive zone"). Windows
+    // will not extend into this strip -- this is what makes the dock
+    // "clip" windows above it instead of floating over their content.
+    // Matches the pill's own real height (ButtonHeight + top/bottom
+    // padding) plus the gap it sits above the screen edge, so the
+    // reserved strip is exactly as tall as the dock actually is -- no
+    // gap where a window could still sneak underneath, no wasted space
+    // above it either.
+    constexpr int DockExclusiveZone = ButtonHeight + DockPadding * 2 + DockMarginBottom;
 }

@@ -93,14 +93,18 @@ int main(int argc, char *argv[])
     // open/close -- Dock::syncSurfaceSize() keeps the layer surface's
     // desired size in sync while running.
     //
-    // exclusive zone 0 = don't reserve space: maximized windows may pass
-    // underneath the dock (macOS-style floating dock). Change it to 40
-    // here if you'd rather have windows stop above it.
+    // Theme::DockExclusiveZone reserves that strip of screen for the
+    // dock, the same way real macOS does by default: windows stop above
+    // it instead of extending underneath (which is what a `0` here would
+    // do -- the dock still draws on top either way, since it's on
+    // LayerTop, but with 0 reserved, windows don't know to leave room and
+    // the dock ends up floating over their content instead of the
+    // content stopping short of it).
     makeLayerSurface(
         &dock,
         LayerShellQt::Window::LayerTop,
         Anchors(LayerShellQt::Window::AnchorBottom),
-        0,
+        Theme::DockExclusiveZone,
         dock.sizeHint(),
         QMargins(0, 0, 0, Theme::DockMarginBottom));
     if (dock.hasApps())
