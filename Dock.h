@@ -3,6 +3,8 @@
 #include <QWidget>
 #include <QPushButton>
 #include <QHBoxLayout>
+#include <QIcon>
+#include <QColor>
 
 #include <wayland-client.h>
 #include "wlr-ftm.h"
@@ -10,17 +12,62 @@
 #include <string>
 #include <vector>
 
-// One open window's dock button.
+// A resolved dock icon.
+//
+//   icon     the icon itself; null => draw the letter placeholder instead
+//   backing  a chip color to paint behind the icon, or an invalid QColor
+//            to draw it bare. Decided once at resolve time from the
+//            icon's pixels: a monochrome glyph (e.g. a "-symbolic" icon)
+//            would vanish on the dark dock without a contrasting chip,
+//            while full-color icons look best bare.
+struct DockIcon
+{
+    QIcon icon;
+    QColor backing;
+};
+
+// One icon cell in the dock. Custom-painted (no QSS, which is why it
+// draws exactly what you see): a rounded hover highlight, the app icon
+// (slightly enlarged while hovered, macOS-style), a small dot under the
+// focused window's icon, or a letter chip when no icon could be found.
+class DockButton : public QPushButton
+{
+public:
+    explicit DockButton(QWidget *parent = nullptr);
+
+    // `name` is the app_id (or the title before the app_id arrives) and
+    // is only used to pick the placeholder letter.
+    void setDockIcon(const DockIcon &icon, const QString &name);
+    void setActive(bool active);
+
+protected:
+    void paintEvent(QPaintEvent *) override;
+    void enterEvent(QEnterEvent *) override;
+    void leaveEvent(QEvent *) override;
+
+private:
+    DockIcon icon_;
+    QString letter_ = QStringLiteral("?");
+    bool active_ = false;
+};
+
+// One open window's dock entry.
 struct AppWindow
 {
     zwlr_foreign_toplevel_handle_v1 *handle = nullptr;
     std::string title;
-    QPushButton *button = nullptr;
+    std::string appId;
+    DockIcon icon;
+    // The compositor sends "state" then "done"; the dot must only change
+    // on done, so the last state event is queued here first.
+    bool pendingActive = false;
+    DockButton *button = nullptr;
 };
 
-// The bottom bar: one button per open window, via
-// wlr-foreign-toplevel-management. Clicking a button asks the compositor
-// to focus that window.
+// The floating bottom pill: one icon per open window, via
+// wlr-foreign-toplevel-management. Clicking an icon asks the compositor
+// to focus that window. Anchored bottom-only, so the compositor centers
+// it and it is exactly as wide as its icons (see syncSurfaceSize()).
 //
 // The real bug in the original single-file version was here: the
 // per-window listener (title/closed/...) was declared but never attached
@@ -34,11 +81,17 @@ public:
 
     void setWayland(wl_display *display, wl_seat *seat);
 
+    // True once at least one window exists -- used by main.cpp to decide
+    // whether to show the dock at startup (an empty pill floating at the
+    // bottom of the screen would look like a bug).
+    bool hasApps() const { return !apps_.empty(); }
+
     // Called once per already-open or newly-opened window (from the
     // manager-level "toplevel" event -- see kManagerListener in Dock.cpp).
     void addApp(zwlr_foreign_toplevel_handle_v1 *handle);
     void removeApp(zwlr_foreign_toplevel_handle_v1 *handle);
     void setTitle(zwlr_foreign_toplevel_handle_v1 *handle, const char *title);
+    void setAppId(zwlr_foreign_toplevel_handle_v1 *handle, const char *appId);
     void activate(zwlr_foreign_toplevel_handle_v1 *handle);
 
     // The manager-level listener (one "a new window appeared" event).
@@ -52,6 +105,16 @@ protected:
 
 private:
     void rebuild();
+
+    // Resizes the widget (and the layer surface) to the layout's size
+    // hint, so the pill is always exactly as wide as its icons, and
+    // re-checks visibility. Call after any change to apps_.
+    void syncSurfaceSize();
+
+    // state/done are a pair: queueState() stores the last state event,
+    // applyDone() flips the dots once the compositor says it's done.
+    void queueState(zwlr_foreign_toplevel_handle_v1 *handle, const wl_array *state);
+    void applyDone(zwlr_foreign_toplevel_handle_v1 *handle);
 
     // Per-window listener callbacks (title changed, window closed, ...).
     // Signatures are fixed by the protocol (plain C function pointers),

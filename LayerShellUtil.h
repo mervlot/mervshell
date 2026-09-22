@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QWindow>
 #include <QSize>
+#include <QMargins>
 #include <LayerShellQt/Window>
 
 // Turns a plain QWidget into a wlr-layer-shell surface: forces the native
@@ -22,7 +23,8 @@ inline LayerShellQt::Window *makeLayerSurface(
     LayerShellQt::Window::Layer layer,
     QFlags<LayerShellQt::Window::Anchor> anchors,
     int exclusiveZone,
-    QSize desiredSize)
+    QSize desiredSize,
+    QMargins margins = QMargins())
 {
     // winId() forces Qt to create the underlying native (QWindow) surface
     // right now instead of lazily on first show() -- LayerShellQt::Window
@@ -40,6 +42,7 @@ inline LayerShellQt::Window *makeLayerSurface(
     layerWindow->setExclusiveZone(exclusiveZone);
     layerWindow->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityNone);
     layerWindow->setDesiredSize(desiredSize);
+    layerWindow->setMargins(margins);
 
     return layerWindow;
 }

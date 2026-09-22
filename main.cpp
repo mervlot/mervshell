@@ -6,6 +6,7 @@
 #include "bg.h"
 #include "Taskbar.h"
 #include "Dock.h"
+#include "Theme.h"
 
 #include <cstdio>
 
@@ -84,14 +85,26 @@ int main(int argc, char *argv[])
         QSize(0, 32));
     taskbar.show();
 
+    // --- Dock: floating, centered pill -----------------------------------
+    // Anchoring ONLY the bottom edge (no left/right) is what makes the
+    // compositor center the surface horizontally instead of stretching it
+    // across the screen. Combined with the content-sized width below, the
+    // dock is exactly as wide as its icons and grows/shrinks as windows
+    // open/close -- Dock::syncSurfaceSize() keeps the layer surface's
+    // desired size in sync while running.
+    //
+    // exclusive zone 0 = don't reserve space: maximized windows may pass
+    // underneath the dock (macOS-style floating dock). Change it to 40
+    // here if you'd rather have windows stop above it.
     makeLayerSurface(
         &dock,
         LayerShellQt::Window::LayerTop,
-        Anchors(LayerShellQt::Window::AnchorBottom) | LayerShellQt::Window::AnchorLeft |
-        LayerShellQt::Window::AnchorRight,
-        40,
-        QSize(0, 40));
-    dock.show();
+        Anchors(LayerShellQt::Window::AnchorBottom),
+        0,
+        dock.sizeHint(),
+        QMargins(0, 0, 0, Theme::DockMarginBottom));
+    if (dock.hasApps())
+        dock.show(); // no windows yet => the dock shows itself later
 
     return app.exec();
 }

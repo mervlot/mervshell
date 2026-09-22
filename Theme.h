@@ -12,8 +12,22 @@ constexpr const char *TaskBackground = "#10141c";
     constexpr const char *TextColor        = "#ffffff";
     constexpr const char *MutedTextColor   = "#9aa4b2";
 
-    constexpr int ButtonHeight  = 32;
-    constexpr int ButtonRadius  = 6;
+    constexpr int ButtonHeight  = 54;  // dock icon cell: icon strip + indicator dot row
+    constexpr int ButtonRadius  = 6;   // corner radius of the hover highlight
     constexpr int BarSpacing    = 4;
     constexpr int BarMargin     = 4;
+
+    // --- Dock: the floating macOS-style pill --------------------------------
+    // The dock anchors to the bottom edge ONLY (see main.cpp), so the
+    // compositor centers it horizontally and it is exactly as wide as its
+    // icons -- it grows/shrinks as windows open/close.
+    constexpr int ButtonWidth      = 46;   // width of one icon cell
+    constexpr int IconSize         = 34;   // drawn icon size (x1.10 while hovered)
+    constexpr int DockRadius       = 16;   // pill corner radius
+    constexpr int DockPadding      = 6;    // icons -> pill edge
+    constexpr int DockSpacing      = 3;    // gap between icon cells
+    constexpr int DockMarginBottom = 6;    // gap between pill and screen bottom
+    constexpr int DotRadius        = 3;    // focused-window indicator dot
+    constexpr int DockBorderAlpha  = 28;   // 0-255: subtle rim highlight on the pill
+    constexpr int DockHoverAlpha   = 36;   // 0-255: highlight behind the hovered icon
 }
