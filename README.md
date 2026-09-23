@@ -1,8 +1,5 @@
 # MervShell (Qt / LayerShellQt version)
 
-> **Full manual:** see [DOCUMENTATION.md](DOCUMENTATION.md) for how to draw on
-> the desktop, add drag & drop, and the complete "where to put what" map.
-
 Your working dock, split into files, with the actual bug fixed, plus a
 top bar (clock + battery) and a background layer.
 
