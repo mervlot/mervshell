@@ -401,9 +401,14 @@ void DockButton::paintEvent(QPaintEvent *)
 
     const bool hovered = underMouse();
 
-    // Everything above the bottom strip is the icon area; the strip
-    // itself holds the focused-window indicator dot.
-    const QRectF iconArea(0, 0, width(), height() - 12.0);
+    // The icon is centered in the FULL cell -- not a shrunk-down area
+    // with a strip reserved at the bottom for an indicator. That
+    // reserved strip used to be there for the old dot, and since most
+    // icons aren't the active window (no dot drawn), the empty strip
+    // made every icon look pushed up off-center. The active-window bar
+    // below is now just drawn as an overlay near the bottom of this same
+    // full-height area, so it never shifts or resizes the icon itself.
+    const QRectF iconArea(0, 0, width(), height());
 
     if (hovered) {
         p.setPen(Qt::NoPen);
@@ -443,10 +448,16 @@ void DockButton::paintEvent(QPaintEvent *)
     }
 
     if (active_) {
+        // A flat, centered capsule instead of the old dot -- drawn as a
+        // pure overlay near the bottom edge of the cell, entirely
+        // independent of iconRect above, so it can never nudge the icon
+        // off its own centered position or touch its aspect ratio.
+        const QRectF bar((width() - Theme::ActiveIndicatorWidth) / 2.0,
+                          height() - Theme::ActiveIndicatorGap - Theme::ActiveIndicatorHeight,
+                          Theme::ActiveIndicatorWidth, Theme::ActiveIndicatorHeight);
         p.setPen(Qt::NoPen);
         p.setBrush(QColor(255, 255, 255, 215));
-        p.drawEllipse(QPointF(width() / 2.0, height() - 7.0),
-                      Theme::DotRadius, Theme::DotRadius);
+        p.drawRoundedRect(bar, Theme::ActiveIndicatorHeight / 2.0, Theme::ActiveIndicatorHeight / 2.0);
     }
 }
 
@@ -587,8 +598,15 @@ void Dock::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
+    // Theme::DockBackground stays a plain opaque hex everywhere else
+    // (it's shared with Taskbar's fill), so the translucency is applied
+    // here as a separate alpha on top rather than baking it into the hex
+    // string -- Theme::DockBackgroundAlpha is the one knob to turn for
+    // "more/less see-through", independent of the actual color.
+    QColor pillColor(Theme::DockBackground);
+    pillColor.setAlpha(Theme::DockBackgroundAlpha);
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(Theme::DockBackground));
+    p.setBrush(pillColor);
     p.drawRoundedRect(rect(), Theme::DockRadius, Theme::DockRadius);
 
     QPen pen(QColor(255, 255, 255, Theme::DockBorderAlpha));

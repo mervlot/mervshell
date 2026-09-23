@@ -26,10 +26,17 @@ constexpr const char *TaskBackground = "#10141c";
     constexpr int DockRadius       = 16;   // pill corner radius
     constexpr int DockPadding      = 6;    // icons -> pill edge
     constexpr int DockSpacing      = 3;    // gap between icon cells
-    constexpr int DockMarginBottom = 0;    // gap between pill and screen bottom
-    constexpr int DotRadius        = 3;    // focused-window indicator dot
+    constexpr int DockMarginBottom = 2 ;    // gap between pill and screen bottom
     constexpr int DockBorderAlpha  = 28;   // 0-255: subtle rim highlight on the pill
     constexpr int DockHoverAlpha   = 36;   // 0-255: highlight behind the hovered icon
+    constexpr int DockBackgroundAlpha = 200; // 0-255: pill translucency (255 = opaque)
+
+    // The focused-window indicator: a flat capsule near the bottom of the
+    // icon cell, drawn as a pure overlay (see DockButton::paintEvent) so
+    // it never shifts or resizes the icon itself.
+    constexpr int ActiveIndicatorWidth  = 16;
+    constexpr int ActiveIndicatorHeight = 3;
+    constexpr int ActiveIndicatorGap    = 4;  // gap between the bar and the very bottom of the cell
 
     // How much vertical space at the bottom of the screen the dock
     // reserves for itself (the layer-shell "exclusive zone"). Windows
