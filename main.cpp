@@ -1,114 +1,89 @@
 #include <QApplication>
 #include <QStyleFactory>
 
-#include "WaylandGlobals.h"
 #include "LayerShellUtil.h"
-#include "bg.h"
+#include "Background.h"
 #include "Taskbar.h"
 #include "Dock.h"
-#include "Theme.h"
 
-#include <cstdio>
+// This is the simplified, learning version of MervShell.
+//
+// It creates three plain Qt widgets and turns each one into a Wayland
+// "layer-shell" surface using LayerShellQt:
+//
+//   Background -> fills the whole screen, on the "background" layer
+//   Taskbar    -> a bar at the top, on the "top" layer
+//   Dock       -> a bar at the bottom, on the "top" layer
+//
+// A layer-shell surface is a special kind of window that sticks to an
+// edge (or edges) of the screen instead of floating around like a normal
+// application window. "Anchors" describe which edges it sticks to; the
+// "layer" decides whether it draws above or below normal windows.
+//
+// The full-featured version of MervShell -- real running-window
+// tracking, icon lookup, pinning apps, dragging the dock, and so on --
+// lives on the "advanced" git branch. This branch is deliberately much
+// simpler, to make the Qt + Wayland basics easier to see.
 
 int main(int argc, char *argv[])
 {
+    // Tell Qt to talk to Wayland, and to create layer-shell surfaces
+    // instead of normal windows.
     qputenv("QT_QPA_PLATFORM", "wayland");
     qputenv("QT_WAYLAND_SHELL_INTEGRATION", "layer-shell");
 
     QApplication app(argc, argv);
 
-    // Forces Fusion, which always paints QPushButton exactly as its
-    // stylesheet says. Some system themes (Breeze, Kvantum, ...)
-    // partially ignore QSS text colors on buttons, which can look
-    // exactly like "the text is invisible" -- this sidesteps that
-    // whole class of bug regardless of what desktop theme is installed.
+    // Fusion always draws our buttons using the exact colors we set in
+    // their style sheet, regardless of what desktop theme is installed.
     QApplication::setStyle(QStyleFactory::create("Fusion"));
 
-    // --- wlr-foreign-toplevel-management + wl_seat (for the Dock) ------
-    WaylandGlobals wayland;
-    if (!wayland.connect()) {
-        std::printf("mervshell: could not connect to Wayland globals\n");
-        return 1;
-    }
-
-    // --- Build the three bars -------------------------------------------
+    // Create our three widgets. At this point they are just plain Qt
+    // widgets -- nothing Wayland-specific has happened yet.
     Background background;
-
     Taskbar taskbar;
-
     Dock dock;
-    background.setWallpaper(
-    "/home/mervlot/Wallpaper/photo_2026-09-22_08-33-08.jpg"
-); 
-    dock.setWayland(wayland.display(), wayland.seat());
 
-    // Attach the manager-level listener now that we have a Dock to hand
-    // it events. Every already-open window fires its "toplevel" event
-    // during WaylandGlobals::connect()'s second roundtrip, and any
-    // future roundtrip picks up newly-opened ones the same way.
-    zwlr_foreign_toplevel_manager_v1_add_listener(
-        wayland.toplevelManager(), &Dock::kManagerListener, &dock);
-    wl_display_roundtrip(wayland.display());
+    // Put an image file named "wallpaper.jpg" in this folder, or change
+    // this path to point at any image you like.
+    background.setWallpaper("wallpaper.jpg");
 
-    wayland.pumpEventsWithQt();
+    // LayerShellQt::Window::Anchor is a plain enum. ORing two of its
+    // values together (AnchorTop | AnchorLeft) normally produces a plain
+    // int in C++, and QFlags refuses to accept a plain int back --
+    // wrapping the first value in Anchors(...) avoids that error. You
+    // don't need to fully understand this line yet; just copy the
+    // pattern when you add a new surface.
+    using Anchor = LayerShellQt::Window::Anchor;
+    using Anchors = QFlags<Anchor>;
 
-    // --- Turn each widget into a real layer-shell surface ---------------
-    // Same function, three times -- see LayerShellUtil.h. This is the
-    // pattern to copy if you add a fourth bar later.
-
-    // Note the explicit Anchors(...) wrapping the first flag in each
-    // group below. LayerShellQt::Window::Anchor is a plain enum; ORing
-    // two raw enum values together (`AnchorTop | AnchorBottom`) uses
-    // C++'s built-in integer OR and produces a plain `int`, which QFlags
-    // refuses to implicitly convert back from (that's the
-    // "invalid conversion from 'int' to 'Anchor'" error). Wrapping the
-    // first value in Anchors(...) makes every following `|` resolve to
-    // QFlags's own operator| instead, which returns Anchors the whole
-    // way through.
-    using Anchors = QFlags<LayerShellQt::Window::Anchor>;
-
+    // Background: anchored to all four edges, so it fills the screen.
     makeLayerSurface(
         &background,
         LayerShellQt::Window::LayerBackground,
-        Anchors(LayerShellQt::Window::AnchorTop) | LayerShellQt::Window::AnchorBottom |
-        LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorRight,
-        -1,               // exclusive zone: background doesn't reserve space
-        QSize(0, 0));      // 0,0 = fill the whole output
+        Anchors(Anchor::AnchorTop) | Anchor::AnchorBottom |
+        Anchor::AnchorLeft | Anchor::AnchorRight,
+        -1,          // exclusive zone: -1 means "don't reserve screen space"
+        QSize(0, 0)); // 0,0 = let the compositor fill the whole output
     background.show();
 
+    // Taskbar: anchored to the top edge, stretched full width.
     makeLayerSurface(
         &taskbar,
         LayerShellQt::Window::LayerTop,
-        Anchors(LayerShellQt::Window::AnchorTop) | LayerShellQt::Window::AnchorLeft |
-        LayerShellQt::Window::AnchorRight,
-        32,
+        Anchors(Anchor::AnchorTop) | Anchor::AnchorLeft | Anchor::AnchorRight,
+        32,                 // reserve 32 pixels so windows don't sit under it
         QSize(0, 32));
     taskbar.show();
 
-    // --- Dock: floating, centered pill -----------------------------------
-    // Anchoring ONLY the bottom edge (no left/right) is what makes the
-    // compositor center the surface horizontally instead of stretching it
-    // across the screen. Combined with the content-sized width below, the
-    // dock is exactly as wide as its icons and grows/shrinks as windows
-    // open/close -- Dock::syncSurfaceSize() keeps the layer surface's
-    // desired size in sync while running.
-    //
-    // Theme::DockExclusiveZone reserves that strip of screen for the
-    // dock, the same way real macOS does by default: windows stop above
-    // it instead of extending underneath (which is what a `0` here would
-    // do -- the dock still draws on top either way, since it's on
-    // LayerTop, but with 0 reserved, windows don't know to leave room and
-    // the dock ends up floating over their content instead of the
-    // content stopping short of it).
+    // Dock: anchored to the bottom edge, stretched full width.
     makeLayerSurface(
         &dock,
         LayerShellQt::Window::LayerTop,
-        Anchors(LayerShellQt::Window::AnchorBottom),
-        Theme::DockExclusiveZone,
-        dock.sizeHint(),
-        QMargins(0, 0, 0, Theme::DockMarginBottom));
-    if (dock.hasApps())
-        dock.show(); // no windows yet => the dock shows itself later
+        Anchors(Anchor::AnchorBottom) | Anchor::AnchorLeft | Anchor::AnchorRight,
+        60,
+        QSize(0, 60));
+    dock.show();
 
     return app.exec();
 }
